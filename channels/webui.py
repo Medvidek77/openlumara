@@ -420,7 +420,6 @@ async def index(request: Request):
             "request": request,
             "js_files": JS_FILES,
             "css_files": CSS_FILES,
-            "version": str(int(time.time())),
             "require_login": bool(channel_instance.config.get("require_login"))
         }
     )
