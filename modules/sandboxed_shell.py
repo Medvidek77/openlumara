@@ -114,6 +114,20 @@ class SandboxedShell(core.module.Module):
         if not self.runtime:
             return self.result(f"Docker or podman are not installed or available.", False)
 
+        # Validate container is still running, podman rootless tends to drop the container
+        # if the socket hangs or the system sleeps.
+        try:
+            check_res = subprocess.run(
+                [self.runtime, 'inspect', '-f', '{{.State.Running}}', self.container_name],
+                capture_output=True, text=True, timeout=5
+            )
+            if check_res.returncode != 0 or check_res.stdout.strip() != "true":
+                # Try to restart it by calling __init__ logic basically, or just tell the user
+                # We can't easily re-init here synchronously but we can try to start it
+                subprocess.run([self.runtime, 'start', self.container_name], capture_output=True, timeout=10)
+        except Exception:
+            pass # we tried
+
         # Execute the command via 'exec'
         exec_cmd = [
             self.runtime, 'exec',
