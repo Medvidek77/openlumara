@@ -42,60 +42,80 @@ class AddySkills(core.module.Module):
 
         core.log("addy_skills", "Addy-Skills Module loaded.")
 
-    @core.module.command("skill list", help="List all available and enabled Addy Agent Skills.")
-    async def list_skills(self):
-        skills_dir = self._get_skills_dir()
-        available_skills = [f.replace(".md", "") for f in os.listdir(skills_dir) if f.endswith(".md")]
-        enabled_skills = self.config.get("enabled_skills") or []
+    @core.module.command("skill", help={"list": "List all available and enabled Addy Agent Skills.", "enable <name>": "Enable a specific Addy Agent Skill.", "disable <name>": "Disable a specific Addy Agent Skill."})
+    async def handle_skill(self, args):
+        if not args:
+            return "Please specify an action (list, enable, disable)."
 
-        if not available_skills:
-            msg = "No skills found in data/skills/."
-        else:
-            msg = "Available Skills:\n"
-            for skill in available_skills:
-                status = "[ENABLED]" if skill in enabled_skills else "[DISABLED]"
-                msg += f"- {skill} {status}\n"
+        action = args[0].lower().strip()
 
-        if self.channel:
-            self.channel.announce(msg)
+        if action == "list":
+            skills_dir = self._get_skills_dir()
+            available_skills = [f.replace(".md", "") for f in os.listdir(skills_dir) if f.endswith(".md")]
+            enabled_skills = self.config.get("enabled_skills") or []
 
-    @core.module.command("skill enable", help="Enable a specific Addy Agent Skill.")
-    async def enable_skill(self, skill_name: str):
-        skills_dir = self._get_skills_dir()
-        available_skills = [f.replace(".md", "") for f in os.listdir(skills_dir) if f.endswith(".md")]
+            if not available_skills:
+                msg = "No skills found in data/skills/."
+            else:
+                msg = "Available Skills:\n"
+                for skill in available_skills:
+                    status = "[ENABLED]" if skill in enabled_skills else "[DISABLED]"
+                    msg += f"- {skill} {status}\n"
 
-        if skill_name not in available_skills:
-            msg = f"Skill '{skill_name}' not found. Use '/skill list' to see available skills."
             if self.channel:
                 self.channel.announce(msg)
-            return
+            return msg
 
-        enabled_skills = self.config.get("enabled_skills") or []
-        if skill_name not in enabled_skills:
-            enabled_skills.append(skill_name)
-            self.config.set("enabled_skills", enabled_skills)
-            core.config.save()
-            msg = f"Skill '{skill_name}' has been enabled."
+        elif action == "enable":
+            skill_args = args[1:]
+            if not skill_args:
+                return "Please provide a skill name."
+
+            skill_name = " ".join(skill_args).strip()
+            skills_dir = self._get_skills_dir()
+            available_skills = [f.replace(".md", "") for f in os.listdir(skills_dir) if f.endswith(".md")]
+
+            if skill_name not in available_skills:
+                msg = f"Skill '{skill_name}' not found. Use '/skill list' to see available skills."
+                if self.channel:
+                    self.channel.announce(msg)
+                return msg
+
+            enabled_skills = self.config.get("enabled_skills") or []
+            if skill_name not in enabled_skills:
+                enabled_skills.append(skill_name)
+                self.config.set("enabled_skills", enabled_skills)
+                core.config.save()
+                msg = f"Skill '{skill_name}' has been enabled."
+            else:
+                msg = f"Skill '{skill_name}' is already enabled."
+
+            if self.channel:
+                self.channel.announce(msg)
+            return msg
+
+        elif action == "disable":
+            skill_args = args[1:]
+            if not skill_args:
+                return "Please provide a skill name."
+
+            skill_name = " ".join(skill_args).strip()
+            enabled_skills = self.config.get("enabled_skills") or []
+
+            if skill_name in enabled_skills:
+                enabled_skills.remove(skill_name)
+                self.config.set("enabled_skills", enabled_skills)
+                core.config.save()
+                msg = f"Skill '{skill_name}' has been disabled."
+            else:
+                msg = f"Skill '{skill_name}' is not enabled."
+
+            if self.channel:
+                self.channel.announce(msg)
+            return msg
+
         else:
-            msg = f"Skill '{skill_name}' is already enabled."
-
-        if self.channel:
-            self.channel.announce(msg)
-
-    @core.module.command("skill disable", help="Disable a specific Addy Agent Skill.")
-    async def disable_skill(self, skill_name: str):
-        enabled_skills = self.config.get("enabled_skills") or []
-
-        if skill_name in enabled_skills:
-            enabled_skills.remove(skill_name)
-            self.config.set("enabled_skills", enabled_skills)
-            core.config.save()
-            msg = f"Skill '{skill_name}' has been disabled."
-        else:
-            msg = f"Skill '{skill_name}' is not enabled."
-
-        if self.channel:
-            self.channel.announce(msg)
+            return f"Unknown skill action: {action}. Available actions: list, enable, disable"
 
     async def on_system_prompt(self):
         """
